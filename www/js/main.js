@@ -266,10 +266,10 @@ var BB = {
     
     // Game Over        
     endGame: function() {
-        BB.gameState = GAMESTATE_STOP;
-        vibrate();
-        ncmbController.sendScore(BB.score);
-    },
+    BB.gameState = GAMESTATE_STOP;
+    vibrate();
+    ncmbController.sendScore(BB.score);
+},
     
     // Game Clear
     clearGame: function() {
@@ -277,7 +277,7 @@ var BB = {
         else alert("Cleared!");
         
         BB.gameState = GAMESTATE_STOP;
-         ncmbController.sendScore(BB.score);
+    ncmbController.sendScore(BB.score);
     }
 }
 
