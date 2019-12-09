@@ -46,6 +46,147 @@ var ncmbController={
             console.log(err);
         });
 },
+createUser: function() {
+    var self = this;
+
+    //適当なUUIDを作成
+    var uuid = self.uuid();
+
+    //ユーザークラスのインスタンスを作成
+    //userNameとパスワードにはuuidを設定
+    var user = new self.ncmb.User({userName:uuid, password:uuid});
+
+    //会員登録を行うメソッドを実行
+    user.signUpByAccount()
+        .then(function(user){
+            // 登録完了後ログイン
+            localStorage.setItem("userName", uuid);
+           user.signUpByAccount()
+    .then(function(user){
+        // 登録完了後ログイン
+        localStorage.setItem("userName", uuid);
+        self.loginWithUUID();
+    })
+        })
+        .catch(function(err){
+            // userName が被った場合はエラーが返る
+            alert("ユーザー登録に失敗しました");
+        });
+  },
+  uuid:function(){
+    var uuid = " ",i,random;
+    for(i=0;i<32;i++){
+      random = Math.random()*16|0;
+      if(i==8||i==12||i==16||i==20){
+        uuid+="-"
+      }
+      uuid+=(i==12?4:(i==16?(random&3|8):random)).toString(16);
+    }
+    return uuid;
+  },
+  loginWithUUID: function() {
+    var self = this;
+    var userName = localStorage.getItem("userName");
+
+    if(!userName){
+        // ユーザーを作成したことがない
+        self.createUser();
+    } else if(!self.currentUser) {
+        // ログアウト状態：userNameとパスワードでログイン
+        // 今回はパスワード（第2引数）もuserNameを使用
+        self.ncmb.User.login(userName, userName)
+            .then(function(user){
+                // ログイン後：ユーザーデータの更新
+                self.currentUser = user;
+                self.refreshCurrentUser();
+            })
+            .catch(function(err){
+                // 失敗した場合：ユーザー作成
+                console.log(err);
+                self.createUser();
+            });
+    } else {
+        // ログアウトしていない（前のログインデータが残っている）
+        self.currentUser = self.ncmb.User.getCurrentUser();
+
+        // userオブジェクトを使用してログイン
+        self.ncmb.User.login(self.currentUser)
+            .then(function(user){
+                // ログイン後：ユーザーデータの更新
+                self.currentUser = user;
+                self.refreshCurrentUser();
+            })
+            .catch(function(err){
+                // セッション切れの場合はログアウトして再ログイン
+                console.log(err);
+
+                self.ncmb.User.logout();  // ログアウト
+                self.currentUser = null;
+                self.loginWithUUID();       // 再ログイン
+            });
+    }
+},
+refreshCurrentUser: function() {
+    var self = this;
+    if(!self.currentUser) return;
+
+    // オブジェクトIDを用いてユーザーを検索（fetchById）
+    self.ncmb.User.fetchById(self.currentUser.get("objectId"))
+             .then(function(user){
+                 self.currentUser = user;
+              })
+             .catch(function(err){
+                console.log(err);
+                self.currentUser = null;
+              });
+},
+showDisplayNameDialog: function() {
+    var self = this;
+
+    $("#mask").show();
+    // ダイアログを左右中央に表示する
+    $("#userEditWrapper").css("top", self.screenSize.height / 2 - 100);
+    $("#userEditWrapper").css("left", self.screenSize.width * 0.1);
+    $("#userEditWrapper").show();
+},
+
+// ユーザー名登録
+updateDisplayName: function(){
+    $("#userEditWrapper").hide();
+    $("#mask").hide();
+
+    // 入力した名前をカレントユーザーにセット
+    var name = $("#name").val();
+    this.currentUser.set("displayName", name);
+
+    // 会員情報の更新
+    return this.currentUser.update();
+},
+finishGame: function(score){
+    var self = this;
+
+    if(!self.currentUser){
+        self.loginWithUUID();
+    } else if(!self.currentUser.displayName){
+        // まだユーザー名を登録していない場合
+        self.showDisplayNameDialog();
+
+        $("#submit").on("click", function(){
+            self.updateDisplayName()
+                .then(function() {
+                    self.sendScore(score);
+                })
+                .catch(function(err) {
+                    console.log(err);
+                    alert("ユーザー名の登録に失敗しました");
+                });
+        });
+    } else {
+        // ユーザー名登録済：スコア送信
+        self.sendScore(score);
+    }
+},
+
     // 初期化
     init: function(screenSize) {
         var self = this;
